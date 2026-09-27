@@ -65,7 +65,13 @@ export const searchCompanies = createServerFn({ method: "POST" })
       "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
       encodeURIComponent(locationQuery);
 
-    const geoRes = await fetch(geoUrl, { headers: { "User-Agent": UA, Accept: "application/json" } });
+    const geoRes = await fetch(geoUrl, {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    }).catch(() => null);
+    if (!geoRes) {
+      return { ok: false as const, error: "O serviço de localização demorou demais. Tente novamente.", results: [] };
+    }
     if (!geoRes.ok) {
       return { ok: false as const, error: "Não foi possível localizar a região informada.", results: [] };
     }
