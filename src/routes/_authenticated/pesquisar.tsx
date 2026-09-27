@@ -224,7 +224,7 @@ function SearchPage() {
               />
               Somente com telefone
             </label>
-            {results.length > 0 ? (
+            {visibleResults.length > 0 ? (
               <Button onClick={saveAll} disabled={saving}>
                 {saving ? "Salvando..." : "Salvar na minha base"}
               </Button>
