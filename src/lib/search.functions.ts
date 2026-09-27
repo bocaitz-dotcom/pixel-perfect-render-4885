@@ -84,52 +84,11 @@ export const searchCompanies = createServerFn({ method: "POST" })
 
     const radius = data.radiusKm * 1000;
     const body =
-      `[out:json][timeout:40];(` +
+      `[out:json][timeout:25];(` +
       filters.map((f) => `nwr${f}(around:${radius},${lat},${lon});`).join("") +
       `);out center tags ${data.limit};`;
 
-    const endpoints = [
-      "https://overpass-api.de/api/interpreter",
-      "https://overpass.private.coffee/api/interpreter",
-      "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-      "https://overpass.kumi.systems/api/interpreter",
-    ];
-    let overpassRes: Response | null = null;
-    let busy = false;
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": UA,
-            Accept: "application/json",
-          },
-          body: "data=" + encodeURIComponent(body),
-        });
-        const ct = res.headers.get("content-type") ?? "";
-        if (res.ok && ct.includes("json")) {
-          overpassRes = res;
-          break;
-        }
-        if (res.status === 429 || res.status === 504) busy = true;
-        console.error(`[overpass] ${url} -> ${res.status} ${ct}`);
-      } catch (err) {
-        console.error(`[overpass] ${url} failed`, err);
-      }
-    }
-
-    if (!overpassRes) {
-      return {
-        ok: false as const,
-        error: busy
-          ? "A fonte de dados está ocupada no momento. Tente novamente em alguns segundos."
-          : "Falha ao consultar a fonte de dados. Tente novamente.",
-        results: [],
-      };
-    }
-
-    const payload = (await overpassRes.json()) as {
+    type OverpassPayload = {
       elements: Array<{
         type: string;
         id: number;
@@ -139,6 +98,65 @@ export const searchCompanies = createServerFn({ method: "POST" })
         tags?: Record<string, string>;
       }>;
     };
+
+    // Consulta todos os servidores ao mesmo tempo e usa o primeiro que responder.
+    const endpoints = [
+      "https://overpass-api.de/api/interpreter",
+      "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+    const controllers = endpoints.map(() => new AbortController());
+    const timer = setTimeout(() => controllers.forEach((c) => c.abort()), 30000);
+    let busy = false;
+
+    const attempt = async (url: string, i: number): Promise<OverpassPayload> => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": UA,
+          Accept: "application/json",
+        },
+        body: "data=" + encodeURIComponent(body),
+        signal: controllers[i]!.signal,
+      });
+      const ct = res.headers.get("content-type") ?? "";
+      if (!res.ok || !ct.includes("json")) {
+        if (res.status === 429 || res.status === 504) busy = true;
+        console.error(`[overpass] ${url} -> ${res.status} ${ct}`);
+        throw new Error(`status ${res.status}`);
+      }
+      const json = (await res.json()) as OverpassPayload;
+      if (!Array.isArray(json.elements)) throw new Error("invalid payload");
+      return json;
+    };
+
+    let payload: OverpassPayload | null = null;
+    try {
+      payload = await Promise.any(
+        endpoints.map((url, i) =>
+          attempt(url, i).then((p) => {
+            controllers.forEach((c, j) => j !== i && c.abort());
+            return p;
+          }),
+        ),
+      );
+    } catch {
+      payload = null;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!payload) {
+      return {
+        ok: false as const,
+        error: busy
+          ? "A fonte de dados está ocupada no momento. Tente novamente em alguns segundos."
+          : "Os servidores de mapas gratuitos não responderam a tempo. Tente de novo ou diminua o raio.",
+        results: [],
+      };
+    }
 
     const seen = new Set<string>();
     const results: SearchResult[] = [];
