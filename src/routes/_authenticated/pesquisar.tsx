@@ -264,7 +264,7 @@ function SearchPage() {
             ))}
           </div>
 
-          {results.length === 0 ? (
+          {visibleResults.length === 0 ? (
             <div className="surface-card mt-4 p-8 text-center text-sm text-muted-foreground">
               Nenhuma empresa encontrada para esse nicho e localidade. Tente aumentar o raio.
             </div>
