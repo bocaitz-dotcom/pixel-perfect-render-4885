@@ -46,6 +46,13 @@ function SearchPage() {
   const [radiusKm, setRadiusKm] = useState(10);
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [onlyWithPhone, setOnlyWithPhone] = useState(false);
+
+  const visibleResults = results
+    ? onlyWithPhone
+      ? results.filter((r) => r.phone)
+      : results
+    : null;
 
   const search = useMutation({
     mutationFn: async () =>
@@ -200,13 +207,24 @@ function SearchPage() {
         </div>
       ) : null}
 
-      {results && !search.isPending ? (
+      {visibleResults && !search.isPending ? (
         <div className="mt-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              Encontradas {results.length} empresas · {results.filter((r) => !r.has_website).length} sem site
+              Encontradas {visibleResults.length} empresas ·{" "}
+              {visibleResults.filter((r) => !r.has_website).length} sem site ·{" "}
+              {visibleResults.filter((r) => r.phone).length} com telefone
             </p>
-            {results.length > 0 ? (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={onlyWithPhone}
+                onChange={(e) => setOnlyWithPhone(e.target.checked)}
+                className="size-4 accent-primary"
+              />
+              Somente com telefone
+            </label>
+            {visibleResults.length > 0 ? (
               <Button onClick={saveAll} disabled={saving}>
                 {saving ? "Salvando..." : "Salvar na minha base"}
               </Button>
@@ -214,7 +232,7 @@ function SearchPage() {
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {results.map((r) => (
+            {visibleResults.map((r) => (
               <div key={r.source_id} className="surface-card p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold leading-tight">{r.name}</h3>
@@ -246,7 +264,7 @@ function SearchPage() {
             ))}
           </div>
 
-          {results.length === 0 ? (
+          {visibleResults.length === 0 ? (
             <div className="surface-card mt-4 p-8 text-center text-sm text-muted-foreground">
               Nenhuma empresa encontrada para esse nicho e localidade. Tente aumentar o raio.
             </div>
