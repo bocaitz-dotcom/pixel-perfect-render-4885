@@ -34,7 +34,7 @@ export type Database = {
           rating: number | null
           review_count: number | null
           source: string
-          source_id: string | null
+          source_id: string
           state: string | null
           updated_at: string
           user_id: string
@@ -59,7 +59,7 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           source?: string
-          source_id?: string | null
+          source_id?: string
           state?: string | null
           updated_at?: string
           user_id: string
@@ -84,7 +84,7 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           source?: string
-          source_id?: string | null
+          source_id?: string
           state?: string | null
           updated_at?: string
           user_id?: string
