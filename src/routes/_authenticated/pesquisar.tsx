@@ -46,6 +46,13 @@ function SearchPage() {
   const [radiusKm, setRadiusKm] = useState(10);
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [onlyWithPhone, setOnlyWithPhone] = useState(false);
+
+  const visibleResults = results
+    ? onlyWithPhone
+      ? results.filter((r) => r.phone)
+      : results
+    : null;
 
   const search = useMutation({
     mutationFn: async () =>

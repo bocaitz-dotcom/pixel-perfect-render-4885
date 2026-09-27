@@ -148,7 +148,13 @@ export const searchCompanies = createServerFn({ method: "POST" })
       const name = tags["name"];
       if (!name) continue;
 
-      const phone = tags["phone"] ?? tags["contact:phone"] ?? null;
+      const phone =
+        tags["phone"] ??
+        tags["contact:phone"] ??
+        tags["contact:mobile"] ??
+        tags["contact:whatsapp"] ??
+        tags["mobile"] ??
+        null;
       const website = tags["website"] ?? tags["contact:website"] ?? null;
       const dedupeKey = `${name.toLowerCase().trim()}|${phone ?? ""}`;
       if (seen.has(dedupeKey)) continue;
