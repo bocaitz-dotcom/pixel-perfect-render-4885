@@ -88,21 +88,45 @@ export const searchCompanies = createServerFn({ method: "POST" })
       filters.map((f) => `nwr${f}(around:${radius},${lat},${lon});`).join("") +
       `);out center tags ${data.limit};`;
 
-    const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
-      body: "data=" + encodeURIComponent(body),
-    });
+    const endpoints = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+      "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+    let overpassRes: Response | null = null;
+    let busy = false;
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": UA,
+            Accept: "application/json",
+          },
+          body: "data=" + encodeURIComponent(body),
+        });
+        const ct = res.headers.get("content-type") ?? "";
+        if (res.ok && ct.includes("json")) {
+          overpassRes = res;
+          break;
+        }
+        if (res.status === 429 || res.status === 504) busy = true;
+        console.error(`[overpass] ${url} -> ${res.status} ${ct}`);
+      } catch (err) {
+        console.error(`[overpass] ${url} failed`, err);
+      }
+    }
 
-    if (overpassRes.status === 429 || overpassRes.status === 504) {
+    if (!overpassRes) {
       return {
         ok: false as const,
-        error: "A fonte de dados está ocupada no momento. Tente novamente em alguns segundos.",
+        error: busy
+          ? "A fonte de dados está ocupada no momento. Tente novamente em alguns segundos."
+          : "Falha ao consultar a fonte de dados. Tente novamente.",
         results: [],
       };
-    }
-    if (!overpassRes.ok) {
-      return { ok: false as const, error: "Falha ao consultar a fonte de dados.", results: [] };
     }
 
     const payload = (await overpassRes.json()) as {
